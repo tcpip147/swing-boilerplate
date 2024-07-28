@@ -252,6 +252,7 @@ public class TCDialog extends JDialog {
 
         private final int WM_NCCALCSIZE = 0x0083;
         private final int WM_NCHITTEST = 0x0084;
+        private final int WM_NCMOUSELEAVE = 0x02A2;
 
         private final int HTTOPLEFT = 13;
         private final int HTTOP = 12;
@@ -283,6 +284,9 @@ public class TCDialog extends JDialog {
                         return User32Ex.INSTANCE.CallWindowProc(oriWndProc, hWnd, uMsg, wParam, lParam);
                     }
                     return lResult;
+                case WM_NCMOUSELEAVE:
+                    controlBox.inHover = 0;
+                    controlBox.repaint();
                 default:
                     return User32Ex.INSTANCE.CallWindowProc(oriWndProc, hWnd, uMsg, wParam, lParam);
             }
