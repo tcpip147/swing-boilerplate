@@ -2,13 +2,10 @@ package com.tcpip147.component;
 
 import com.sun.jna.Library;
 import com.sun.jna.Native;
-import com.sun.jna.platform.win32.BaseTSD.LONG_PTR;
-import com.sun.jna.platform.win32.User32;
-import com.sun.jna.platform.win32.WinDef.HWND;
-import com.sun.jna.platform.win32.WinDef.LPARAM;
-import com.sun.jna.platform.win32.WinDef.LRESULT;
-import com.sun.jna.platform.win32.WinDef.WPARAM;
+import com.sun.jna.platform.win32.WinNT;
 import com.sun.jna.platform.win32.WinNT.HRESULT;
+import com.sun.jna.platform.win32.User32;
+import com.sun.jna.platform.win32.BaseTSD.LONG_PTR;
 import com.sun.jna.win32.W32APIOptions;
 
 import javax.swing.*;
@@ -17,12 +14,15 @@ import java.awt.event.*;
 
 import static com.sun.jna.platform.win32.WinUser.*;
 
-public class TCFrame extends JFrame {
+public class TCDialog extends JDialog {
+
+    private final Window parent;
 
     private final int TITLE_HEIGHT = 30;
     private final int BUTTON_WIDTH = 47;
     private final int BORDER_THICKNESS = 6;
 
+    private final TCDialog self = this;
     private final TCWndProc wndProc = new TCWndProc();
     private final TCBlockUI blockUI = new TCBlockUI();
 
@@ -44,12 +44,33 @@ public class TCFrame extends JFrame {
     private boolean loaded;
     private double hidpiScale = 1;
 
-    public TCFrame() throws HeadlessException {
-        super();
+    public TCDialog(Window parent) throws HeadlessException {
+        super(parent);
+        this.parent = parent;
+
+        if (parent instanceof TCFrame) {
+            TCFrame frame = (TCFrame) parent;
+            titleBarBackground = frame.getTitleBarBackground();
+            titleBarForeground = frame.getTitleBarForeground();
+            buttonHoverBackground = frame.getButtonHoverBackground();
+            closeButtonHoverBackground = frame.getCloseButtonHoverBackground();
+            buttonPressedBackground = frame.getButtonPressedBackground();
+            closeButtonPressedBackground = frame.getCloseButtonPressedBackground();
+        } else if (parent instanceof TCDialog) {
+            TCDialog dialog = (TCDialog) parent;
+            titleBarBackground = dialog.getTitleBarBackground();
+            titleBarForeground = dialog.getTitleBarForeground();
+            buttonHoverBackground = dialog.getButtonHoverBackground();
+            closeButtonHoverBackground = dialog.getCloseButtonHoverBackground();
+            buttonPressedBackground = dialog.getButtonPressedBackground();
+            closeButtonPressedBackground = dialog.getCloseButtonPressedBackground();
+        }
+
         contentPanel = new JPanel();
         contentPanel.setLayout(new BorderLayout());
         contentPanel.setOpaque(false);
         setContentPane(contentPanel);
+        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
 
         /* titleBar */
         titleBarPanel = new JPanel();
@@ -92,18 +113,6 @@ public class TCFrame extends JFrame {
             }
         });
 
-        addComponentListener(new ComponentAdapter() {
-            @Override
-            public void componentResized(ComponentEvent e) {
-                super.componentResized(e);
-                if (getExtendedState() == MAXIMIZED_BOTH) {
-                    getRootPane().setBorder(BorderFactory.createEmptyBorder(BORDER_THICKNESS, BORDER_THICKNESS, BORDER_THICKNESS, BORDER_THICKNESS));
-                } else {
-                    getRootPane().setBorder(null);
-                }
-            }
-        });
-
         pack();
     }
 
@@ -135,41 +144,18 @@ public class TCFrame extends JFrame {
     }
 
     private void lazySetup() {
-        if (getIconImage() != null) {
-            Image image = getIconImage();
+        if (parent.getIconImages().get(0) != null) {
+            Image image = parent.getIconImages().get(0);
             JLabel titleBarIcon = new JLabel(new ImageIcon(image.getScaledInstance(16, 16, Image.SCALE_SMOOTH)));
             titleBarIcon.setPreferredSize(new Dimension(16, 16));
             logoPanel.add(titleBarIcon, 0);
+            setIconImage(image.getScaledInstance(16, 16, Image.SCALE_SMOOTH));
         }
         titleBarLabel.setFont(getFont());
         titleBarLabel.setText(getTitle());
         titleBarLabel.setForeground(titleBarForeground);
         titleBarPanel.setBackground(titleBarBackground);
         titleBarPanel.setForeground(titleBarForeground);
-    }
-
-    public void setTitleBarBackground(Color titleBarBackground) {
-        this.titleBarBackground = titleBarBackground;
-    }
-
-    public void setTitleBarForeground(Color titleBarForeground) {
-        this.titleBarForeground = titleBarForeground;
-    }
-
-    public void setButtonHoverBackground(Color buttonHoverBackground) {
-        this.buttonHoverBackground = buttonHoverBackground;
-    }
-
-    public void setCloseButtonHoverBackground(Color closeButtonHoverBackground) {
-        this.closeButtonHoverBackground = closeButtonHoverBackground;
-    }
-
-    public void setButtonPressedBackground(Color buttonPressedBackground) {
-        this.buttonPressedBackground = buttonPressedBackground;
-    }
-
-    public void setCloseButtonPressedBackground(Color closeButtonPressedBackground) {
-        this.closeButtonPressedBackground = closeButtonPressedBackground;
     }
 
     public Color getCloseButtonPressedBackground() {
@@ -207,16 +193,12 @@ public class TCFrame extends JFrame {
         private int inPressed;
 
         public ControlBox() {
-            setPreferredSize(new Dimension(BUTTON_WIDTH * 3, TITLE_HEIGHT));
+            setPreferredSize(new Dimension(BUTTON_WIDTH, TITLE_HEIGHT));
             addMouseListener(new MouseAdapter() {
                 @Override
                 public void mousePressed(MouseEvent e) {
                     super.mousePressed(e);
-                    if (e.getX() >= 0 && e.getX() < BUTTON_WIDTH) {
-                        inPressed = 1;
-                    } else if (e.getX() >= BUTTON_WIDTH && e.getX() < BUTTON_WIDTH * 2) {
-                        inPressed = 2;
-                    } else if (e.getX() >= BUTTON_WIDTH * 2) {
+                    if (e.getX() >= 0) {
                         inPressed = 3;
                     }
                 }
@@ -225,15 +207,7 @@ public class TCFrame extends JFrame {
                 public void mouseReleased(MouseEvent e) {
                     super.mouseReleased(e);
                     if (inHover == inPressed) {
-                        if (inHover == 1) {
-                            setExtendedState(getExtendedState() + ICONIFIED);
-                        } else if (inHover == 2) {
-                            if (getExtendedState() == MAXIMIZED_BOTH) {
-                                setExtendedState(NORMAL);
-                            } else {
-                                setExtendedState(MAXIMIZED_BOTH);
-                            }
-                        } else if (inHover == 3) {
+                        if (inHover == 3) {
                             Window window = SwingUtilities.getWindowAncestor(box);
                             processWindowEvent(new WindowEvent(window, WindowEvent.WINDOW_CLOSING));
                         }
@@ -255,47 +229,7 @@ public class TCFrame extends JFrame {
             Graphics2D g2d = (Graphics2D) g;
             g2d.setStroke(new BasicStroke(1.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 
-            /* minimize */
-            if (inHover == 1) {
-                if (inPressed == inHover) {
-                    g2d.setColor(buttonPressedBackground);
-                } else {
-                    g2d.setColor(buttonHoverBackground);
-                }
-            } else {
-                g2d.setColor(titleBarBackground);
-            }
-            g2d.fillRect(0, 0, BUTTON_WIDTH, TITLE_HEIGHT);
-            g2d.setColor(titleBarForeground);
-            g2d.drawLine(BUTTON_WIDTH / 2 - 5, TITLE_HEIGHT / 2, BUTTON_WIDTH / 2 + 5, TITLE_HEIGHT / 2);
-
-            /* maximize */
-            int offset = BUTTON_WIDTH;
-            if (inHover == 2) {
-                if (inPressed == inHover) {
-                    g2d.setColor(buttonPressedBackground);
-                } else {
-                    g2d.setColor(buttonHoverBackground);
-                }
-            } else {
-                g2d.setColor(titleBarBackground);
-            }
-            g2d.fillRect(offset, 0, BUTTON_WIDTH, TITLE_HEIGHT);
-            g2d.setColor(titleBarForeground);
-            if (getExtendedState() == MAXIMIZED_BOTH) {
-                Point point = new Point(BUTTON_WIDTH / 2 - 5 + offset, TITLE_HEIGHT / 2 - 3);
-                g2d.drawRect(point.x, point.y, 8, 8);
-                point = new Point(BUTTON_WIDTH / 2 + 5 + offset, TITLE_HEIGHT / 2 - 5);
-                g2d.drawLine(point.x, point.y, point.x - 8, point.y);
-                g2d.drawLine(point.x, point.y, point.x, point.y + 8);
-                g2d.drawLine(point.x - 8, point.y, point.x - 8, point.y + 2);
-                g2d.drawLine(point.x, point.y + 8, point.x - 2, point.y + 8);
-            } else {
-                g2d.drawRect(BUTTON_WIDTH / 2 - 5 + offset, TITLE_HEIGHT / 2 - 5, 9, 9);
-            }
-
             /* close */
-            offset = BUTTON_WIDTH * 2;
             if (inHover == 3) {
                 if (inPressed == inHover) {
                     g2d.setColor(closeButtonPressedBackground);
@@ -305,10 +239,10 @@ public class TCFrame extends JFrame {
             } else {
                 g2d.setColor(titleBarBackground);
             }
-            g2d.fillRect(offset, 0, BUTTON_WIDTH, TITLE_HEIGHT);
+            g2d.fillRect(0, 0, BUTTON_WIDTH, TITLE_HEIGHT);
             g2d.setColor(titleBarForeground);
-            g2d.drawLine(BUTTON_WIDTH / 2 - 5 + offset, TITLE_HEIGHT / 2 - 5, BUTTON_WIDTH / 2 + 5 + offset, TITLE_HEIGHT / 2 + 5);
-            g2d.drawLine(BUTTON_WIDTH / 2 + 5 + offset, TITLE_HEIGHT / 2 - 5, BUTTON_WIDTH / 2 - 5 + offset, TITLE_HEIGHT / 2 + 5);
+            g2d.drawLine(BUTTON_WIDTH / 2 - 5, TITLE_HEIGHT / 2 - 5, BUTTON_WIDTH / 2 + 5, TITLE_HEIGHT / 2 + 5);
+            g2d.drawLine(BUTTON_WIDTH / 2 + 5, TITLE_HEIGHT / 2 - 5, BUTTON_WIDTH / 2 - 5, TITLE_HEIGHT / 2 + 5);
 
             g2d.dispose();
         }
@@ -371,13 +305,9 @@ public class TCFrame extends JFrame {
             if (pos.y >= rect.top && pos.y < rect.top + TITLE_HEIGHT * hidpiScale) {
                 onResize = pos.y < (rect.top + BORDER_THICKNESS);
                 if (!onResize) {
-                    onDrag = (pos.y <= rect.top + TITLE_HEIGHT * hidpiScale) && (pos.x < rect.right - (BUTTON_WIDTH * 3 * hidpiScale));
+                    onDrag = (pos.y <= rect.top + TITLE_HEIGHT * hidpiScale) && (pos.x < rect.right - (BUTTON_WIDTH * hidpiScale));
                 }
-                if (pos.x >= rect.right - BUTTON_WIDTH * 3 * hidpiScale && pos.x < rect.right - BUTTON_WIDTH * 2 * hidpiScale) {
-                    controlBox.inHover = 1;
-                } else if (pos.x >= rect.right - BUTTON_WIDTH * 2 * hidpiScale && pos.x < rect.right - BUTTON_WIDTH * hidpiScale) {
-                    controlBox.inHover = 2;
-                } else if (pos.x >= rect.right - BUTTON_WIDTH * hidpiScale) {
+                if (pos.x >= rect.right - BUTTON_WIDTH * hidpiScale) {
                     controlBox.inHover = 3;
                 } else {
                     controlBox.inHover = 0;
