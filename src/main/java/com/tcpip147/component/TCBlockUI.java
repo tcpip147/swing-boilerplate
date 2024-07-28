@@ -42,6 +42,7 @@ public class TCBlockUI extends JPanel {
                 try {
                     runnable.run();
                 } catch (Exception e) {
+                    e.printStackTrace();
                     throw e;
                 }
                 return null;
