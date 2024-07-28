@@ -1,5 +1,6 @@
 package com.tcpip147.page;
 
+import com.tcpip147.component.TCButton;
 import com.tcpip147.component.TCDialog;
 import com.tcpip147.component.TCFrame;
 
@@ -13,7 +14,7 @@ public class MainPage extends JPanel {
 
     public MainPage() {
         {
-            JButton button = new JButton("Block UI");
+            TCButton button = new TCButton("Block UI");
             button.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseClicked(MouseEvent e) {
@@ -31,7 +32,7 @@ public class MainPage extends JPanel {
         }
 
         {
-            JButton button = new JButton("Open Dialog");
+            TCButton button = new TCButton("Open Dialog");
             button.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseClicked(MouseEvent e) {
